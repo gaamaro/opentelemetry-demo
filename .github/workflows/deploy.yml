@@ -88,10 +88,14 @@ jobs:
           echo "🔌 Testando conexão SSH com debug..."
           ssh -vvv ec2 'echo "Conexão SSH bem sucedida!"' || (echo "❌ Erro na conexão SSH" && exit 1)
 
-      - name: Copy Dynatrace Config
+      - name: Prepare EC2
         run: |
+          echo "🔧 Preparando ambiente na EC2..."
+          ssh ec2 'sudo mkdir -p /repo && sudo chown ubuntu:ubuntu /repo'
+          ssh ec2 'cd /repo && git clone https://github.com/gaamaro/opentelemetry-demo.git || (cd opentelemetry-demo && git pull)'
+          
+          echo "📝 Copiando arquivo de configuração do Dynatrace..."
           scp dynatrace.env ec2:/repo/opentelemetry-demo/
-          echo "✅ Arquivo de variáveis copiado para EC2"
 
       - name: Deploy to EC2
         run: |
