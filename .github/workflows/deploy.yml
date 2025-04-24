@@ -50,10 +50,13 @@ jobs:
             exit 1
           fi
           echo "✅ IP da EC2 encontrado: $EC2_IP"
+          echo "EC2_IP=$EC2_IP" >> $GITHUB_ENV
           
           # Obter chave SSH
+          echo "🔑 Obtendo chave SSH do Vault..."
           curl -s -k -H "X-Vault-Token: ${VAULT_TOKEN}" ${VAULT_ADDR}/v1/kv/data/ssh-default | jq -r '.data.data.private_key' > private_key.pem
           chmod 600 private_key.pem
+          echo "PRIVATE_KEY_PATH=$PWD/private_key.pem" >> $GITHUB_ENV
           
           # Obter credenciais Dynatrace
           DT_ENDPOINT=$(curl -s -k -H "X-Vault-Token: ${VAULT_TOKEN}" ${VAULT_ADDR}/v1/kv/data/dynatrace | jq -r '.data.data.env')
@@ -62,21 +65,31 @@ jobs:
           # Criar arquivo de variáveis do Dynatrace
           echo "DT_ENDPOINT=$DT_ENDPOINT" > dynatrace.env
           echo "DT_API_TOKEN=$DT_API_TOKEN" >> dynatrace.env
+
+      - name: Setup and Test SSH Connection
+        run: |
+          echo "🔍 Verificando chave SSH..."
+          ls -la ${{ env.PRIVATE_KEY_PATH }}
+          echo "Primeiras linhas da chave:"
+          head -n 2 ${{ env.PRIVATE_KEY_PATH }}
           
-          # Configurar SSH
+          echo "🔧 Configurando SSH..."
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           echo "Host ec2
-            HostName $EC2_IP
+            HostName ${{ env.EC2_IP }}
             User ec2-user
-            IdentityFile $PWD/private_key.pem
+            IdentityFile ${{ env.PRIVATE_KEY_PATH }}
             StrictHostKeyChecking no" > ~/.ssh/config
           
-          # Testar conexão SSH
-          ssh -q ec2 exit || (echo "❌ Erro na conexão SSH" && exit 1)
-          echo "✅ Conexão SSH estabelecida"
+          echo "📄 Configuração SSH:"
+          cat ~/.ssh/config
           
-          # Copiar arquivo de variáveis para a EC2
+          echo "🔌 Testando conexão SSH com debug..."
+          ssh -vvv ec2 'echo "Conexão SSH bem sucedida!"' || (echo "❌ Erro na conexão SSH" && exit 1)
+
+      - name: Copy Dynatrace Config
+        run: |
           scp dynatrace.env ec2:/repo/opentelemetry-demo/
           echo "✅ Arquivo de variáveis copiado para EC2"
 
