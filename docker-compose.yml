@@ -801,14 +801,14 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1.1G
+          memory: 1.5G
     restart: unless-stopped
     environment:
       - cluster.name=demo-cluster
       - node.name=demo-node
       - bootstrap.memory_lock=true
       - discovery.type=single-node
-      - OPENSEARCH_JAVA_OPTS=-Xms300m -Xmx300m
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
       - DISABLE_INSTALL_DEMO_CONFIG=true
       - DISABLE_SECURITY_PLUGIN=true
       # Workaround on OSX for https://bugs.openjdk.org/browse/JDK-8345296
@@ -823,9 +823,9 @@ services:
     ports:
       - "9200"
     healthcheck:
-      test: curl -s http://localhost:9200/_cluster/health | grep -E '"status":"(green|yellow)"'
-      start_period: 10s
-      interval: 5s
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -E '\"status\":\"(green|yellow)\"' || exit 1"]
+      start_period: 30s
+      interval: 10s
       timeout: 10s
       retries: 10
     logging: *logging
