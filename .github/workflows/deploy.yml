@@ -78,7 +78,7 @@ jobs:
           chmod 700 ~/.ssh
           echo "Host ec2
             HostName ${{ env.EC2_IP }}
-            User ec2-user
+            User ubuntu
             IdentityFile ${{ env.PRIVATE_KEY_PATH }}
             StrictHostKeyChecking no" > ~/.ssh/config
           
