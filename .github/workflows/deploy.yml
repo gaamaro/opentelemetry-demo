@@ -26,6 +26,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Install make
+        run: |
+          sudo apt-get update && sudo apt-get install make
+
+      - name: Configure Vault
+        env:
+          VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
+        run: |
+          export VAULT_ADDR=$VAULT_ADDR
+          export VAULT_TOKEN=$VAULT_TOKEN
+
       - name: Deploy to EC2
         run: |
           cd startup
