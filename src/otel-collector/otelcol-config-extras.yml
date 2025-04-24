@@ -16,3 +16,44 @@
 #    pipelines:
 #      traces:
 #        exporters: [spanmetrics, otlphttp/example]
+
+exporters:
+  otlphttp/dynatrace:
+    endpoint: ${DT_ENDPOINT}
+    headers:
+      Authorization: "Api-Token ${DT_API_TOKEN}"
+    compression: gzip
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+
+processors:
+  batch:
+    timeout: 30s
+    send_batch_size: 1000
+  
+  # Converte métricas cumulativas em delta para o Dynatrace
+  cumulativetodelta:
+    include:
+      match_type: regexp
+      metric_names:
+        - .*count.*
+        - .*total.*
+        - .*sum.*
+        - .*bytes.*
+        - .*operations.*
+        - .*requests.*
+        - .*errors.*
+    max_idle_duration: 60s
+
+service:
+  pipelines:
+    traces:
+      exporters: [spanmetrics, otlphttp/dynatrace]
+    metrics:
+      processors: [cumulativetodelta, batch]
+      exporters: [otlphttp/dynatrace]
+    logs:
+      exporters: [otlphttp/dynatrace]

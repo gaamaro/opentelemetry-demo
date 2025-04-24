@@ -30,15 +30,58 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install make
 
-      - name: Configure Vault
+      - name: Configure Vault and Get Secrets
         env:
           VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
           VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
         run: |
-          export VAULT_ADDR=$VAULT_ADDR
-          export VAULT_TOKEN=$VAULT_TOKEN
+          # Criar diretório SSH
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          
+          # Obter IP da EC2 e tratar duplicidade
+          RAW_IP=$(vault kv get -field=ip kv/data/ec2-ip)
+          # Pegar apenas o primeiro IP válido da lista
+          EC2_IP=$(echo "$RAW_IP" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
+          
+          # Validar se temos um IP válido
+          if [[ ! $EC2_IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "IP inválido encontrado: $EC2_IP"
+            exit 1
+          fi
+          
+          echo "IP da EC2 encontrado: $EC2_IP"
+          echo "EC2_IP=$EC2_IP" >> $GITHUB_ENV
+          
+          # Obter chave SSH privada
+          vault kv get -field=private_key kv/data/ssh-default > ~/.ssh/ec2_private_key
+          chmod 600 ~/.ssh/ec2_private_key
+          
+          # Obter credenciais Dynatrace
+          DT_ENDPOINT=$(vault kv get -field=env kv/data/dynatrace)
+          DT_API_TOKEN=$(vault kv get -field=otel_token kv/data/dynatrace)
+          
+          # Configurar SSH
+          echo "Host ec2
+            HostName $EC2_IP
+            User ec2-user
+            IdentityFile ~/.ssh/ec2_private_key
+            StrictHostKeyChecking no" > ~/.ssh/config
+          
+          # Criar arquivo de variáveis do Dynatrace
+          echo "DT_ENDPOINT=$DT_ENDPOINT" > dynatrace.env
+          echo "DT_API_TOKEN=$DT_API_TOKEN" >> dynatrace.env
+          
+          # Copiar arquivo de variáveis para a EC2
+          scp dynatrace.env ec2:/repo/opentelemetry-demo/
+          
+          # Testar conexão SSH
+          ssh -q ec2 exit || (echo "Erro na conexão SSH" && exit 1)
 
       - name: Deploy to EC2
+        env:
+          VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
         run: |
           cd startup
           make deploy-all
