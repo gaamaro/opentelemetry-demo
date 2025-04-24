@@ -4,6 +4,20 @@ on:
   push:
     tags:
       - '*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Ambiente para deploy'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+      reason:
+        description: 'Motivo do deploy manual'
+        required: true
+        type: string
 
 jobs:
   deploy:
@@ -29,4 +43,11 @@ jobs:
       - name: Deploy to EC2
         run: |
           cd startup
-          make deploy-all 
+          make deploy-all
+
+      - name: Log Deploy Info
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "Deploy manual executado"
+          echo "Ambiente: ${{ github.event.inputs.environment }}"
+          echo "Motivo: ${{ github.event.inputs.reason }}" 
